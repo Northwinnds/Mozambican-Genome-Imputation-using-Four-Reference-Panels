@@ -1,0 +1,137 @@
+# Joint PCA - Imputed Samples + 1kGPAB-c Reference Panel (African-only)
+# Description:
+#   Joint PCA combining imputed low-coverage target samples with the
+#   1kGPAB-c reference panel (1kGP African subset + Bantu dataset).
+#   Imputed samples labelled by geographic origin (North/South).
+#   Both PC1 and PC2 are flipped to better reflect the geographical
+#   layout of African populations.
+#
+# Citation:
+#   Refer to the reference list.
+#
+# Input files:
+#   <afr_eigenvec>.eigenvec  - PLINK2 eigenvec file from African-only joint PCA
+#   <afr_eigenval>.eigenval  - PLINK2 eigenval file from African-only joint PCA
+#   <afr_metadata>.txt       - African population affiliation data: IID, Population
+#   <geo_origin>.xlsx        - Geographic origin: iid, Mozambique_group
+
+library(ggplot2)
+library(readxl)
+
+# User settings
+setwd("<working_directory>")
+afr_eigenvec_file <- "<afr_eigenvec>.eigenvec"
+afr_eigenval_file <- "<afr_eigenval>.eigenval"
+afr_metadata_file <- "<afr_metadata>.txt"
+geo_origin_file   <- "<geo_origin>.xlsx"
+output_plot       <- "<output_plot>.png"
+target_in_ref     <- c("<sample_id_1>", "<sample_id_2>")
+target_prefix     <- "^moz"
+geo_id_col        <- "iid"
+geo_group_col     <- "Mozambique_group"
+north_label       <- "Mozambique_north"
+south_label       <- "Mozambique_south"
+
+# Load PCA eigenvectors and eigenvalues generated from PLINK2
+pca_afr <- read.table(afr_eigenvec_file, header=FALSE, skip=1)
+colnames(pca_afr) <- c("IID", paste0("PC", 1:10))
+eigenval_afr <- read.table(afr_eigenval_file)
+pct_afr <- round(eigenval_afr / sum(eigenval_afr) * 100, 1)
+
+# Label imputed vs reference samples
+# Distinguishes between imputed Mozambican samples
+# and Mozambican samples present in the reference panel
+pca_afr$group <- ifelse(
+  grepl(target_prefix, pca_afr$IID) & !pca_afr$IID %in% target_in_ref,
+  "Mozambican", "Reference"
+)
+
+# Load African population affiliation data (columns: IID, Population)
+afr_meta <- read.table(afr_metadata_file, header=FALSE)
+colnames(afr_meta) <- c("IID", "Population")
+afr_meta$Population[afr_meta$Population == "Bantu_Cabinda"]    <- "CAB"
+afr_meta$Population[afr_meta$Population == "Bantu_Mozambique"] <- "MOZ"
+
+# Merge PCA with affiliation data
+pca_afr_meta <- merge(pca_afr, afr_meta, by="IID", all.x=TRUE)
+
+# Load and merge geographic origin for imputed samples
+meta_moz <- read_excel(geo_origin_file)
+meta_moz[[geo_id_col]] <- tolower(meta_moz[[geo_id_col]])
+pca_afr_meta <- merge(pca_afr_meta, meta_moz, by.x="IID", by.y=geo_id_col, all.x=TRUE)
+
+# Flip both PC axes to better reflect the geographical layout of African populations
+pca_afr_meta$PC1 <- -pca_afr_meta$PC1
+pca_afr_meta$PC2 <- -pca_afr_meta$PC2
+
+# Print sample counts and variance explained
+cat("Sample counts:\n")
+print(table(pca_afr_meta$group))
+cat("PC1:", pct_afr[1,], "% | PC2:", pct_afr[2,], "%\n")
+
+# Assign legend groups (North/South/Reference populations)
+pca_afr_meta$legend_group <- pca_afr_meta$Population
+pca_afr_meta$legend_group[
+  pca_afr_meta$group == "Mozambican" &
+    !is.na(pca_afr_meta[[geo_group_col]]) &
+    pca_afr_meta[[geo_group_col]] == north_label] <- "N MOZ"
+pca_afr_meta$legend_group[
+  pca_afr_meta$group == "Mozambican" &
+    !is.na(pca_afr_meta[[geo_group_col]]) &
+    pca_afr_meta[[geo_group_col]] == south_label] <- "S MOZ"
+
+# Filter to samples with known geographic origin
+plot_data <- pca_afr_meta[!is.na(pca_afr_meta$legend_group) &
+                            pca_afr_meta$legend_group != "Imputed MOZ", ]
+plot_data <- plot_data[
+  plot_data$group == "Reference" |
+    (plot_data$group == "Mozambican" & !is.na(plot_data[[geo_group_col]])), ]
+
+# Factor order for legend
+plot_data$legend_group <- factor(
+  plot_data$legend_group,
+  levels = c("GWD","MSL","YRI","ESN","LWK","CAB","MOZ","N MOZ","S MOZ")
+)
+
+# Colour palette
+cols_all <- c(
+  "CAB"   = "deeppink",
+  "MOZ"   = "purple",
+  "ESN"   = "green",
+  "GWD"   = "red",
+  "LWK"   = "deepskyblue",
+  "MSL"   = "darkorange",
+  "YRI"   = "blue",
+  "N MOZ" = "gray40",
+  "S MOZ" = "black"
+)
+
+# Plot
+p <- ggplot(plot_data, aes(x=PC1, y=PC2, colour=legend_group)) +
+  geom_point(data=plot_data[plot_data$group == "Reference", ],
+             size=2, alpha=0.7) +
+  geom_point(data=plot_data[plot_data$group == "Mozambican", ],
+             size=2.5, alpha=0.9) +
+  scale_colour_manual(values=cols_all) +
+  labs(
+    x = paste0("PC1 (", pct_afr[1,], "%)"),
+    y = paste0("PC2 (", pct_afr[2,], "%)"),
+    colour = ""
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid.major  = element_line(colour="grey90"),
+    panel.grid.minor  = element_blank(),
+    legend.position   = "right",
+    legend.title      = element_blank(),
+    legend.text       = element_text(size=11),
+    legend.key        = element_blank(),
+    legend.background = element_blank(),
+    axis.title        = element_text(size=12),
+    axis.text         = element_text(size=10)
+  ) +
+  guides(colour=guide_legend(override.aes=list(size=4, alpha=1)))
+
+print(p)
+ggsave(output_plot, plot=p, width=10, height=8, dpi=300)
+cat("Plot saved to", output_plot, "\n")
