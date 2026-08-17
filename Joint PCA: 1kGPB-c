@@ -1,0 +1,103 @@
+# Joint PCA - Imputed Samples + 1kGPB-c Reference Panel
+# Description:
+#   Joint PCA combining imputed low-coverage target samples with the
+#   1kGPB-c reference panel (1000 Genomes Project + Bantu dataset).
+#   PC2 is flipped to better reflect the geographical layout of
+#   superpopulations.
+#
+# Citation:
+#   Refer to the reference list.
+#
+# Input files:
+#   <ref_eigenvec>.eigenvec  - PLINK2 eigenvec file from joint PCA
+#   <ref_eigenval>.eigenval  - PLINK2 eigenval file from joint PCA
+#   <metadata>.txt           - Population affiliation: IID, Population, Superpopulation
+
+library(ggplot2)
+
+# User settings
+setwd("<working_directory>")
+ref_eigenvec_file <- "<ref_eigenvec>.eigenvec"
+ref_eigenval_file <- "<ref_eigenval>.eigenval"
+metadata_file     <- "<metadata>.txt"
+output_plot       <- "<output_plot>.png"
+target_in_ref     <- c("<sample_id_1>", "<sample_id_2>")
+target_prefix     <- "^moz"
+imputed_label     <- "MOZ_imputed"
+
+# Load PCA eigenvectors and eigenvalues generated from PLINK2
+pca <- read.table(ref_eigenvec_file, header=FALSE, skip=1)
+colnames(pca) <- c("IID", paste0("PC", 1:10))
+eigenval <- read.table(ref_eigenval_file)
+pct <- round(eigenval / sum(eigenval) * 100, 1)
+
+# Load population affiliation data (columns: IID, Population, Superpopulation)
+meta <- read.table(metadata_file, header=FALSE)
+colnames(meta) <- c("IID", "Population", "Superpopulation")
+
+# Label imputed vs reference samples
+# Distinguishes between imputed Mozambican samples
+# and Mozambican samples present in the reference panel
+pca$group <- ifelse(
+  grepl(target_prefix, pca$IID) & !pca$IID %in% target_in_ref,
+  "Imputed", "Reference"
+)
+
+# Merge PCA with affiliation data
+pca_meta <- merge(pca, meta, by="IID", all.x=TRUE)
+pca_meta$Superpopulation[pca_meta$group == "Imputed"] <- imputed_label
+
+# Flip PC2 to better reflect the geographical layout of superpopulations
+pca_meta$PC2 <- -pca_meta$PC2
+
+# Factor order for legend
+pca_meta$Superpopulation <- factor(
+  pca_meta$Superpopulation,
+  levels = c("AFR", "AFR_Bantu", "AMR", "EAS", "EUR", "SAS", imputed_label)
+)
+
+# Colour palette
+cols <- c(
+  "AFR"         = "darkorange",
+  "AFR_Bantu"   = "brown",
+  "AMR"         = "purple",
+  "EAS"         = "green",
+  "EUR"         = "blue",
+  "SAS"         = "cyan",
+  "MOZ_imputed" = "red"
+)
+
+# Plot - reference samples first, imputed samples plotted on top
+p <- ggplot(pca_meta, aes(x=PC1, y=PC2, colour=Superpopulation)) +
+  geom_point(
+    data  = pca_meta[pca_meta$Superpopulation != imputed_label, ],
+    size  = 1.5, alpha = 0.7, shape = 19
+  ) +
+  geom_point(
+    data  = pca_meta[pca_meta$Superpopulation == imputed_label, ],
+    size  = 2, alpha = 1, shape = 19
+  ) +
+  scale_colour_manual(values=cols) +
+  labs(
+    x = paste0("PC1 (", pct[1,], "%)"),
+    y = paste0("PC2 (", pct[2,], "%)"),
+    colour = ""
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid.major  = element_line(colour="grey90"),
+    panel.grid.minor  = element_blank(),
+    legend.position   = "right",
+    legend.title      = element_blank(),
+    legend.text       = element_text(size=11),
+    legend.key        = element_blank(),
+    legend.background = element_blank(),
+    axis.title        = element_text(size=12),
+    axis.text         = element_text(size=10)
+  ) +
+  guides(colour=guide_legend(override.aes=list(size=4, alpha=1)))
+
+print(p)
+ggsave(output_plot, plot=p, width=10, height=8, dpi=300)
+cat("Plot saved to", output_plot, "\n")
+cat("PC1:", pct[1,], "% | PC2:", pct[2,], "%\n")
