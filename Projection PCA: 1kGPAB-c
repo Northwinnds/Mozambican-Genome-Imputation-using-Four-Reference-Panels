@@ -45,8 +45,9 @@ colnames(proj_afr)[1]    <- "IID"
 colnames(proj_afr)[4:13] <- paste0("PC", 1:10)
 proj_afr <- proj_afr[, c("IID", paste0("PC", 1:10))]
 
-# Label reference groups 
-# Also to distinguish between Mozambique cohorts from imputed vs reference
+# Label reference groups
+# Distinguishes between imputed Mozambican samples and
+# Mozambican samples present in the reference panel
 ref_afr$group <- ifelse(
   grepl(target_prefix, ref_afr$IID) & !ref_afr$IID %in% target_in_ref,
   "Mozambican", "Reference"
