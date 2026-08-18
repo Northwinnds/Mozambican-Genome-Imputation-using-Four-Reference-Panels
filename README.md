@@ -6,4 +6,4 @@ The aim of the project was to analyse the effect of reference panel size and gen
 
 (ii) Joint PCA — combining imputed samples with the reference panel, which produced the expected population clustering results.
 
-This repository contains two folders, each with two R scripts corresponding to the above PCA methods. A reference list and acknowledgement note are also included.
+This repository contains a main PCA folder with two sub-folders, each containing R scripts for the joint PCA and projection PCA methods respectively. A reference folder that has a reference list and acknowledgement note are also included
