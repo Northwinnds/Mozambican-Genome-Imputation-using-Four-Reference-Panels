@@ -1,0 +1,26 @@
+
+Note:
+The below is reference list was used to aide with understanding how to use R in addition to a level (AMBER) use of AI assisted script. 
+
+Reference List:
+
+Anthropic (2026). Claude Sonnet 4.6. Available at: https://claude.ai (Accessed: 30 July 2026).
+
+Cran - R Project (no date) Principal Components Analysis. Available at: https://cran.r-project.org/web/packages/dimensio/vignettes/pca.html (Accessed 30 July 2026)
+
+Crawley, M., (2007) The R Book. West Sussex: John Wiley and Sons Ltd. 
+
+McGinnis, S., (2025) PCA Analysis of U.S. Census Data. Available at: https://rpubs.com/CynthiaMcGinnis/1190553 (Accessed 30 July 2026).
+
+Plotly (2026) PCA Visualization in R. Available at: https://plotly.com/r/pca-visualization/ (Accessed 30 July 2026).
+
+Posit team (2025). RStudio: Integrated Development Environment for R.
+Posit Software, PBC, Boston, MA. URL http://www.posit.co/.
+
+R Coder (2026) R Charts. Available at: https://r-charts.com/colors/ (Accessed 30 July 2026)
+
+Verzani, J. (2002) SimpleR - Using R for Introductory Statistics. Available at: https://snoweye.github.io/R_note/inc_menu/reference/simple-12-oneside-a4.pdf (Accessed 15 June 2026). 
+
+Wickham H (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York. ISBN 978-3-319-24277-4. https://ggplot2.tidyverse.org. 
+
+Wickham, H., Cetinkaya-Rundel, M., and Grolemund, G. (2023) R for Data Science, 2nd edn. O’Reilly Media. (Available at: https://r4ds.hadley.nz/ (Accessed 1 July 2026).
