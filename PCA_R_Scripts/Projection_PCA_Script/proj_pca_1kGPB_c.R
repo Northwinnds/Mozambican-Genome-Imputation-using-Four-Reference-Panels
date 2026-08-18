@@ -1,0 +1,136 @@
+# Projection PCA - Imputed Samples onto 1kGPB-c Reference PCs
+# Description:
+#   Projects imputed low-coverage target samples onto PCs computed from the
+#   1kGPB-c reference panel (1kGP + Bantu dataset). PC2 is flipped to match
+#   joint PCA orientation and the geographical layout of superpopulations.
+#   Includes PC1 offset calculation.
+#
+# Note:
+#   Projection PCA showed a systematic PC1 offset between imputed dosage
+#   values (0-2) and reference hard calls (0, 1 and 2).
+#
+# Citation:
+#   Refer to the reference list.
+#
+# Input files:
+#   <ref_eigenvec>.eigenvec  - PLINK2 eigenvec from reference-only PCA
+#   <ref_eigenval>.eigenval  - PLINK2 eigenval from reference-only PCA
+#   <proj_sscore>.sscore     - PLINK2 sscore from projected imputed samples
+#   <metadata>.txt           - Population affiliation: IID, Population, Superpopulation
+
+library(ggplot2)
+
+# User settings
+setwd("<working_directory>")
+ref_eigenvec_file <- "<ref_eigenvec>.eigenvec"
+ref_eigenval_file <- "<ref_eigenval>.eigenval"
+proj_sscore_file  <- "<proj_sscore>.sscore"
+metadata_file     <- "<metadata>.txt"
+output_plot       <- "<output_plot>.png"
+target_in_ref     <- c("<sample_id_1>", "<sample_id_2>")
+target_prefix     <- "^moz"
+imputed_label     <- "MOZ_imputed"
+
+# Load reference PCA eigenvectors and eigenvalues generated from PLINK2
+ref_pca <- read.table(ref_eigenvec_file, header=FALSE, skip=1)
+colnames(ref_pca) <- c("IID", paste0("PC", 1:10))
+eigenval <- read.table(ref_eigenval_file)
+pct <- round(eigenval / sum(eigenval) * 100, 1)
+
+# Load projected imputed sample scores
+# PLINK2 sscore: col1=IID, col2=ALLELE_CT, col3=DOSAGE_SUM, col4-13=PC1-10
+proj <- read.table(proj_sscore_file, header=TRUE, comment.char="")
+colnames(proj)[1]    <- "IID"
+colnames(proj)[4:13] <- paste0("PC", 1:10)
+proj <- proj[, c("IID", paste0("PC", 1:10))]
+
+# Label reference groups
+# Distinguishes between imputed Mozambican samples
+# and Mozambican samples present in the reference panel
+ref_pca$group <- ifelse(
+  grepl(target_prefix, ref_pca$IID) & !ref_pca$IID %in% target_in_ref,
+  "Mozambican", "Reference"
+)
+
+# Load population affiliation data
+meta <- read.table(metadata_file, header=FALSE)
+colnames(meta) <- c("IID", "Population", "Superpopulation")
+
+# Merge reference with affiliation data
+ref_meta <- merge(ref_pca, meta, by="IID", all.x=TRUE)
+ref_meta$Superpopulation[ref_meta$group == "Mozambican"] <- "AFR_Bantu"
+ref_meta$group <- "Reference"
+
+# Add imputed sample labels
+proj$Superpopulation <- imputed_label
+proj$group           <- "Mozambican"
+
+# Combine reference and projected samples
+combined <- rbind(
+  ref_meta[, c("IID","PC1","PC2","Superpopulation","group")],
+  proj[,    c("IID","PC1","PC2","Superpopulation","group")]
+)
+
+# Flip PC2 to match joint PCA orientation
+combined$PC2 <- -combined$PC2
+
+# Print sample counts and variance explained
+cat("Sample counts:\n")
+print(table(combined$group))
+cat("PC1:", pct[1,], "% | PC2:", pct[2,], "%\n")
+
+# Calculate PC1 offset between reference and imputed samples
+ref_pc1 <- mean(combined$PC1[combined$group == "Reference"])
+imp_pc1 <- mean(combined$PC1[combined$group == "Mozambican"])
+cat("PC1 offset (imputed - reference):", round(imp_pc1 - ref_pc1, 4), "\n")
+
+# Factor order for legend
+combined$Superpopulation <- factor(
+  combined$Superpopulation,
+  levels = c("AFR","AFR_Bantu","AMR","EAS","EUR","SAS", imputed_label)
+)
+
+# Colour palette
+cols <- c(
+  "AFR"         = "darkorange",
+  "AFR_Bantu"   = "brown",
+  "AMR"         = "purple",
+  "EAS"         = "green",
+  "EUR"         = "blue",
+  "SAS"         = "cyan",
+  "MOZ_imputed" = "red"
+)
+
+# Plot - reference samples first, imputed samples plotted on top
+p <- ggplot(combined, aes(x=PC1, y=PC2, colour=Superpopulation)) +
+  geom_point(
+    data  = combined[combined$Superpopulation != imputed_label, ],
+    size  = 1.5, alpha = 0.7, shape = 19
+  ) +
+  geom_point(
+    data  = combined[combined$Superpopulation == imputed_label, ],
+    size  = 2, alpha = 1, shape = 19
+  ) +
+  scale_colour_manual(values=cols) +
+  labs(
+    x = paste0("PC1 (", pct[1,], "%)"),
+    y = paste0("PC2 (", pct[2,], "%)"),
+    colour = ""
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid.major  = element_line(colour="grey90"),
+    panel.grid.minor  = element_blank(),
+    legend.position   = "right",
+    legend.title      = element_blank(),
+    legend.text       = element_text(size=11),
+    legend.key        = element_blank(),
+    legend.background = element_blank(),
+    axis.title        = element_text(size=12),
+    axis.text         = element_text(size=10)
+  ) +
+  guides(colour=guide_legend(override.aes=list(size=4, alpha=1)))
+
+print(p)
+ggsave(output_plot, plot=p, width=10, height=8, dpi=300)
+cat("Plot saved to", output_plot, "\n")
